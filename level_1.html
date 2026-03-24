@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        .container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .up {
+            margin-top: 100px;
+            align-self: center;
+            width: 100%;
+            height: 250px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .up .ans {
+            align-self: center;
+            display: flex;
+            flex-direction: column;
+            width: 300px;
+            height: calc(100% - 30px);
+            background-color: #dcfffd;
+            overflow: hidden;
+        }
+
+        .down .ans {
+            align-self: center;
+            display: flex;
+            flex-direction: column;
+            width: 300px;
+            height: calc(100% - 30px);
+            background-color: #ffd6d6;
+            overflow: hidden;
+        }
+
+        .down {
+            margin-top: 100px;
+            align-self: center;
+            flex-direction: column;
+            width: 100%;
+            height: 250px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .debc {
+            align-self: center;
+            width: 300px;
+            height: 30px;
+            font-size: 20px;
+            outline: none;
+        }
+
+        .thro {
+            align-self: center;
+            width: 300px;
+            height: 30px;
+            font-size: 20px;
+            outline: none;
+        }
+
+        .ans div {
+            width: 100%;
+            height: 50px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="up">
+            <input type="text" placeholder="我是防抖搜索框" class="debc">
+            <div class="ans"></div>
+        </div>
+        <div class="down">
+            <input type="text" placeholder="我是节流搜索框" class="thro">
+            <div class="ans"></div>
+        </div>
+
+    </div>
+
+</body>
+
+<script>
+    // 防抖函数
+    function deBounce(func, delay = 400) {
+        let timer = null
+        return function (...args) {
+            // 向外传递异步对象
+            return new Promise((resolve, reject) => {
+                if (timer) { clearTimeout(timer) }
+                timer = setTimeout(async () => {
+                    // 等待异步函数执行完毕
+                    const res = await func.apply(this, args)
+                    resolve(res)
+                }, delay)
+            })
+        }
+    }
+
+    // 节流函数
+    function throttle(func, delay = 500) {
+        let timer = null   //表示空闲状态
+        return function (...args) {
+            return new Promise((resolve, reject) => {
+                if (timer) { return }
+                timer = setTimeout(async () => {
+                    try {
+                        // 向func函数传递res的数据
+                        const res = await func.apply(this, args)
+                        resolve(res)
+                    } catch (err) {
+                        reject(err)
+                    } finally {
+                        timer = null
+                    }
+                }, delay)
+            })
+        }
+    }
+
+    // 异步搜索函数
+    async function search(keyword) {
+        try {
+            const trimedKeyWords = keyword.trim()
+            if (!trimedKeyWords) return {}
+            const res = await fetch(`http://localhost:3000/api/search?q=${trimedKeyWords}&limit=7`)
+            if (!res.ok) {
+                throw new Error(`Api请求失败${res.status}`)
+            }
+            console.log('Success')
+            return await res.json()
+        } catch (err) {
+            console.log('失败:', err)
+        }
+    }
+
+    // 异步防抖相关
+    const debc = document.querySelector('.debc')
+    const upans = document.querySelector('.up .ans')
+    const getSearchDataDebc = deBounce(search, 500)
+
+    // 异步渲染函数(防抖)
+    async function renderDeBounce(keyword) {
+        // 清除
+        upans.innerHTML = ''
+        // 接收
+        const data = await getSearchDataDebc(keyword)
+        console.log('debc接收成功')
+        // 解析
+        try {
+            let suggests = []
+            const items = data.AS.Results[0].Suggests
+            suggests = items.map(item => ({ text: item.Txt }))
+            // 创建\挂载
+            suggests.forEach(e => {
+                let div = document.createElement('div')
+                div.textContent = e.text
+                upans.appendChild(div)
+            })
+        } catch (err) {
+            console.log('DEBCerror:', err.message)
+        }
+    }
+
+    // 监听输入
+    debc.addEventListener('input', function (e) {
+        renderDeBounce(e.target.value)
+    })
+
+    // 异步渲染函数(节流)
+    const thro = document.querySelector('.thro')
+    const doans = document.querySelector('.down .ans')
+    const getSearchDataThro = throttle(search, 500)
+
+    async function renderThrottle(keyword) {
+        doans.innerHTML = ''
+        const data = await getSearchDataThro(keyword)
+        console.log('thro接收成功')
+        try {
+            let suggests = []
+            const items = data.AS.Results[0].Suggests
+            suggests = items.map(item => ({ text: item.Txt }))
+            // 创建\挂载
+            suggests.forEach(e => {
+                let div = document.createElement('div')
+                div.textContent = e.text
+                doans.appendChild(div)
+            })
+        } catch (err) {
+            console.log('THROerror:', err.message)
+        }
+    }
+
+    thro.addEventListener('input', function (e) {
+        renderThrottle(e.target.value)
+    })
+
+</script>
+
+</html>
